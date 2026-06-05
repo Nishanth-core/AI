@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     secret_key: str = Field("supersecretkey", env="SECRET_KEY")
     jwt_secret: str = Field("supersecretkey", env="JWT_SECRET")
     algorithm: str = Field("HS256", env="ALGORITHM")
-    access_token_expire_minutes: int = Field(60, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    access_token_expire_minutes: int = Field(15, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(7, env="REFRESH_TOKEN_EXPIRE_DAYS")
 
     model_config = {

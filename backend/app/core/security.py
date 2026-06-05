@@ -46,3 +46,11 @@ def verify_refresh_token(token: str) -> dict:
         return {"sub": user_id, "email": email}
     except PyJWTError as exc:
         raise ValueError("Invalid token") from exc
+
+
+def verify_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.algorithm])
+        return payload
+    except PyJWTError:
+        return None

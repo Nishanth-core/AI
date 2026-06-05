@@ -18,14 +18,15 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
-class TokenResponse(BaseModel):
-    success: bool
-    access_token: str
-    refresh_token: Optional[str] = None
-    token_type: str = "bearer"
-
-
 class UserProfile(BaseModel):
     id: str
     name: str
     email: EmailStr
+
+
+class TokenResponse(BaseModel):
+    success: bool
+    user: Optional[UserProfile] = None
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: str = "bearer"

@@ -1,16 +1,13 @@
-import uuid
 from typing import Optional
 
 import bcrypt
 from postgrest import APIError
 
-from app.models.user import User
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+)
 from app.core.supabase_client import supabase
-from app.core.security import create_access_token
-
-
-USER_STORE_BY_EMAIL: dict[str, User] = {}
-USER_STORE_BY_ID: dict[str, User] = {}
 
 
 def hash_password(password: str) -> str:
@@ -21,49 +18,49 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-def get_user_by_email(email: str) -> Optional[User]:
-    return USER_STORE_BY_EMAIL.get(email.lower())
-
-
-def get_user_by_id(user_id: str) -> Optional[User]:
-    return USER_STORE_BY_ID.get(user_id)
-
-
-def create_user(name: str, email: str, password: str) -> User:
-    """In-memory user creation (kept for compatibility / tests)."""
+def fetch_user_by_email(email: str) -> Optional[dict]:
     normalized_email = email.lower()
-    if normalized_email in USER_STORE_BY_EMAIL:
-        raise ValueError("Email already registered")
+    try:
+        result = supabase.table("users").select("*").eq("email", normalized_email).execute()
+    except APIError:
+        return None
 
-    user = User(
-        id=str(uuid.uuid4()),
-        name=name,
-        email=normalized_email,
-        hashed_password=hash_password(password),
-    )
-
-    USER_STORE_BY_EMAIL[normalized_email] = user
-    USER_STORE_BY_ID[user.id] = user
-    return user
+    if not result.data:
+        return None
+    return result.data[0]
 
 
-def authenticate_user(email: str, password: str) -> Optional[User]:
-    user = get_user_by_email(email)
+def fetch_user_by_id(user_id: str) -> Optional[dict]:
+    try:
+        result = supabase.table("users").select("*").eq("id", user_id).single().execute()
+    except APIError:
+        return None
+
+    return result.data
+
+
+def login_user(email: str, password: str) -> Optional[dict]:
+    user = fetch_user_by_email(email)
     if user is None:
         return None
-    if not verify_password(password, user.hashed_password):
+
+    if not verify_password(password, user["password_hash"]):
         return None
-    return user
+
+    access_token = create_access_token({"sub": user["id"], "email": user["email"]})
+    refresh_token = create_refresh_token({"sub": user["id"], "email": user["email"]})
+
+    return {
+        "success": True,
+        "user": {"id": user["id"], "name": user["name"], "email": user["email"]},
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
 
 
 def register_user(name: str, email: str, password: str) -> dict:
-    """Register a user into Supabase, return result dict with token.
-
-    Returns:
-      {"success": True, "user": {...}, "access_token": "..."}
-      or
-      {"success": False, "error": "..."}
-    """
+    """Register a user into Supabase, return result dict with token."""
     normalized_email = email.lower()
 
     try:
@@ -91,7 +88,6 @@ def register_user(name: str, email: str, password: str) -> dict:
         return {"success": False, "error": "Failed to create user"}
 
     user = inserted.data[0]
-
     token = create_access_token({"sub": user.get("id"), "email": user.get("email")})
 
     return {

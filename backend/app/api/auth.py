@@ -11,12 +11,9 @@ from app.schemas.auth import (
     RegisterRequest,
     RefreshRequest,
     TokenResponse,
-    UserProfile,
 )
 from app.services.auth_service import (
-    authenticate_user,
-    create_user,
-    get_user_by_email,
+    login_user,
     register_user,
 )
 
@@ -37,22 +34,14 @@ def register(payload: RegisterRequest):
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
-    user = authenticate_user(payload.email, payload.password)
-    if user is None:
+    result = login_user(payload.email, payload.password)
+    if not result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    access_token = create_access_token({"sub": user.id, "email": user.email})
-    refresh_token = create_refresh_token({"sub": user.id, "email": user.email})
-    return {
-        "success": True,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
+    return result
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -80,6 +69,6 @@ def refresh_token(payload: RefreshRequest):
     }
 
 
-@router.get("/me", response_model=UserProfile)
+@router.get("/me")
 def me(current_user=Depends(get_current_user)):
-    return current_user
+    return {"user": current_user}
