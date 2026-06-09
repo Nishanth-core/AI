@@ -52,8 +52,9 @@ def login_user(email: str, password: str) -> Optional[dict]:
     if not verify_password(password, user["password_hash"]):
         return None
 
-    access_token = create_access_token({"sub": user["id"], "email": user["email"]})
-    refresh_token = create_refresh_token({"sub": user["id"], "email": user["email"]})
+    role = user.get("role", "user")
+    access_token = create_access_token({"sub": user["id"], "email": user["email"], "role": role})
+    refresh_token = create_refresh_token({"sub": user["id"], "email": user["email"], "role": role})
     refresh_expires = (datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)).isoformat()
 
     try:
@@ -103,7 +104,8 @@ def register_user(name: str, email: str, password: str) -> dict:
         return {"success": False, "error": "Failed to create user"}
 
     user = inserted.data[0]
-    token = create_access_token({"sub": user.get("id"), "email": user.get("email")})
+    role = user.get("role", "user")
+    token = create_access_token({"sub": user.get("id"), "email": user.get("email"), "role": role})
 
     return {
         "success": True,

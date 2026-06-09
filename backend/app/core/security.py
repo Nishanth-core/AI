@@ -27,11 +27,20 @@ def verify_access_token(token: str) -> dict:
             raise ValueError("Invalid access token")
         user_id = payload.get("sub")
         email = payload.get("email")
+        role = payload.get("role", "user")
         if user_id is None or email is None:
             raise ValueError("Invalid token payload")
-        return {"sub": user_id, "email": email}
+        return {"sub": user_id, "email": email, "role": role}
     except PyJWTError as exc:
         raise ValueError("Invalid token") from exc
+
+
+def verify_token(token: str) -> dict:
+    """Backward compatibility wrapper for verify_access_token."""
+    try:
+        return verify_access_token(token)
+    except ValueError:
+        return None
 
 
 def verify_refresh_token(token: str) -> dict:

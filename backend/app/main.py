@@ -1,14 +1,20 @@
 from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from postgrest import APIError
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.users import router as users_router
 from app.core.config import settings
 from app.core.supabase_client import supabase
+from app.middleware.rate_limiter import limiter
 
 app = FastAPI(title="InnerWhispers Backend")
+
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
