@@ -147,7 +147,12 @@ def refresh_access_token(refresh_token: str) -> Optional[dict]:
     else:
         expires_dt = datetime.fromisoformat(str(expires_at))
 
-    if datetime.utcnow() > expires_dt:
+    # Ensure both datetimes are naive for comparison
+    now = datetime.utcnow()
+    if expires_dt.tzinfo is not None:
+        expires_dt = expires_dt.replace(tzinfo=None)
+
+    if now > expires_dt:
         return None
 
     try:

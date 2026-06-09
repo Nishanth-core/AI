@@ -7,3 +7,7 @@ passlib[bcrypt]
 email-validator
 supabase
 slowapi
+pytest
+pytest-cov
+httpx
+python-multipart
