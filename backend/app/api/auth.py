@@ -11,10 +11,16 @@ from app.schemas.auth import (
     RegisterRequest,
     RefreshRequest,
     TokenResponse,
+    ForgotPasswordRequest,
+    VerifyOTPRequest,
+    ResetPasswordRequest,
 )
 from app.services.auth_service import (
     login_user,
     register_user,
+    forgot_password,
+    verify_otp,
+    reset_password,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -72,3 +78,26 @@ def refresh_token(payload: RefreshRequest):
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
     return {"user": current_user}
+
+
+@router.post("/forgot-password")
+def forgot_password_api(payload: ForgotPasswordRequest):
+    # best-effort: do not reveal whether account exists
+    forgot_password(payload.email)
+    return {"message": "OTP sent if account exists"}
+
+
+@router.post("/verify-otp")
+def verify_otp_api(payload: VerifyOTPRequest):
+    valid = verify_otp(payload.email, payload.otp)
+    if not valid:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    return {"message": "OTP verified"}
+
+
+@router.patch("/reset-password")
+def reset_password_api(payload: ResetPasswordRequest):
+    success = reset_password(payload.email, payload.otp, payload.new_password)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid request")
+    return {"message": "Password updated"}
