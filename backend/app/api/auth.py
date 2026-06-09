@@ -4,7 +4,6 @@ from app.core.dependencies import get_current_user
 from app.core.security import (
     create_access_token,
     create_refresh_token,
-    verify_refresh_token,
 )
 from app.schemas.auth import (
     LoginRequest,
@@ -21,6 +20,7 @@ from app.services.auth_service import (
     forgot_password,
     verify_otp,
     reset_password,
+    refresh_access_token,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -52,27 +52,14 @@ def login(payload: LoginRequest):
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_token(payload: RefreshRequest):
-    try:
-        token_payload = verify_refresh_token(payload.refresh_token)
-    except ValueError:
+    result = refresh_access_token(payload.refresh_token)
+    if not result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    access_token = create_access_token(
-        {"sub": token_payload["sub"], "email": token_payload["email"]}
-    )
-    refresh_token = create_refresh_token(
-        {"sub": token_payload["sub"], "email": token_payload["email"]}
-    )
-    return {
-        "success": True,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
+    return result
 
 
 @router.get("/me")

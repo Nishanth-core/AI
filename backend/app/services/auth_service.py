@@ -9,6 +9,7 @@ from app.core.email import send_password_reset_email
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    verify_refresh_token,
 )
 from app.core.supabase_client import supabase
 from app.core.otp import generate_otp
@@ -53,6 +54,16 @@ def login_user(email: str, password: str) -> Optional[dict]:
 
     access_token = create_access_token({"sub": user["id"], "email": user["email"]})
     refresh_token = create_refresh_token({"sub": user["id"], "email": user["email"]})
+    refresh_expires = (datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)).isoformat()
+
+    try:
+        supabase.table("refresh_tokens").insert({
+            "user_id": user["id"],
+            "token": refresh_token,
+            "expires_at": refresh_expires,
+        }).execute()
+    except APIError:
+        return None
 
     return {
         "success": True,
@@ -98,6 +109,68 @@ def register_user(name: str, email: str, password: str) -> dict:
         "success": True,
         "user": {"id": user.get("id"), "name": user.get("name"), "email": user.get("email")},
         "access_token": token,
+    }
+
+
+def refresh_access_token(refresh_token: str) -> Optional[dict]:
+    try:
+        payload = verify_refresh_token(refresh_token)
+    except ValueError:
+        return None
+
+    user_id = payload["sub"]
+    email = payload["email"]
+
+    try:
+        token_record = (
+            supabase.table("refresh_tokens")
+            .select("*")
+            .eq("token", refresh_token)
+            .eq("revoked", False)
+            .limit(1)
+            .execute()
+        )
+    except APIError:
+        return None
+
+    if not token_record.data:
+        return None
+
+    record = token_record.data[0]
+    expires_at = record.get("expires_at")
+    if isinstance(expires_at, str):
+        if expires_at.endswith("Z"):
+            expires_at = expires_at.replace("Z", "+00:00")
+        expires_dt = datetime.fromisoformat(expires_at)
+    else:
+        expires_dt = datetime.fromisoformat(str(expires_at))
+
+    if datetime.utcnow() > expires_dt:
+        return None
+
+    try:
+        supabase.table("refresh_tokens").update({"revoked": True}).eq("id", record.get("id")).execute()
+    except APIError:
+        return None
+
+    new_access_token = create_access_token({"sub": user_id, "email": email})
+    new_refresh_token = create_refresh_token({"sub": user_id, "email": email})
+    new_refresh_expires = (datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)).isoformat()
+
+    try:
+        supabase.table("refresh_tokens").insert({
+            "user_id": user_id,
+            "token": new_refresh_token,
+            "expires_at": new_refresh_expires,
+        }).execute()
+    except APIError:
+        return None
+
+    return {
+        "success": True,
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
     }
 
 
